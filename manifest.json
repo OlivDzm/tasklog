@@ -2,8 +2,8 @@
   "name": "TaskLog - Capt Dzune",
   "short_name": "TaskLog",
   "description": "Track tasks and appointments with comments and priorities.",
-  "start_url": "TaskLog.html",
-  "scope": "./",
+  "start_url": "./",
+  "scope": ".",
   "display": "standalone",
   "background_color": "#1e1f21",
   "theme_color": "#1e1f21",
@@ -20,3 +20,4 @@
     }
   ]
 }
+
