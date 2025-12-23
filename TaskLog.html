@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>TaskLog - Capt Dzune</title>
+<link rel="manifest" href="manifest.json">
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    background-color: var(--bg);
+    color: var(--text);
+    margin: 0;
+    padding: 20px;
+    transition: background 0.3s, color 0.3s;
+  }
+
+  /* ---------- Light & Dark Mode Theme Variables ---------- */
+  :root {
+    --bg: #f4f4f4;
+    --card: #f9f9f9;
+    --column-left: #f0f8ff;
+    --column-right: #e6f0ff;
+    --text: #222;
+    --input-bg: #fff;
+    --input-text: #000;
+  }
+
+  body.dark {
+    --bg: #1e1f21;
+    --card: #2a2b2d;
+    --column-left: #25262a;
+    --column-right: #22252b;
+    --text: #e9e9e9;
+    --input-bg: #3a3b3d;
+    --input-text: #fff;
+  }
+
+  h1 { margin-bottom: 20px; }
+  h2, h3 { color: var(--text); }
+
+  .columns {
+    display: flex;
+    gap: 30px;
+    margin-top: 20px;
+  }
+
+  @media (max-width: 768px) {
+    .columns { flex-direction: column; }
+  }
+
+  .column-left, .column-right {
+    flex: 1;
+    padding: 20px;
+    border-radius: 10px;
+    background: var(--column-left);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    transition: background 0.3s;
+  }
+  .column-right {
+    background: var(--column-right);
+  }
+
+  ul { list-style-type: none; padding: 0; }
+
+  /* One shading per TASK based on priority */
+  li.task-high { border-left: 5px solid #ff4136; }
+  li.task-medium { border-left: 5px solid #ff851b; }
+  li.task-low { border-left: 5px solid #2ecc40; }
+
+  /* One shading per APPOINTMENT based on priority */
+  li.appt-high { border-left: 5px solid #1e90ff; }
+  li.appt-medium { border-left: 5px solid #00ced1; }
+  li.appt-low { border-left: 5px solid #32cd32; }
+  li.appt-urgent { border-left: 5px solid #ff4500; }
+
+  li {
+    background: var(--card);
+    padding: 10px;
+    margin: 5px 0;
+    border-radius: 5px;
+    transition: background 0.3s, color 0.3s;
+  }
+
+  .task-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  li button {
+    padding: 4px 8px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+  }
+
+  li textarea {
+    margin-top: 5px;
+    width: 100%;
+    resize: vertical;
+    border-radius: 5px;
+    border: 1px solid #ccc;
+    padding: 5px;
+    background: var(--input-bg);
+    color: var(--input-text);
+  }
+
+  input, select, button {
+    padding: 8px;
+    border-radius: 5px;
+    border: 1px solid #ccc;
+    margin-bottom: 10px;
+    background: var(--input-bg);
+    color: var(--input-text);
+  }
+
+  button#addTaskBtn, button#addApptBtn {
+    background-color: #007bff;
+    color: #fff;
+  }
+  button#addTaskBtn:hover, button#addApptBtn:hover { background-color: #0056b3; }
+
+  button#downloadCSVBtn {
+    background-color: #28a745;
+    color: #fff;
+  }
+  button#downloadCSVBtn:hover { background-color: #1e7e34; }
+
+  #darkModeBtn {
+    background: #444;
+    color: #fff;
+    margin-left: 10px;
+  }
+  body.dark #darkModeBtn {
+    background: #ddd;
+    color: #000;
+  }
+
+  .clear-btn {
+    background-color: #dcdcdc;
+    border: 1.5px solid #b0b0b0;
+    padding: 4px 12px;
+    border-radius: 5px;
+    cursor: pointer;
+    margin: 5px auto 0;
+    font-size: 0.8em;
+  }
+
+  .clear-btn:hover { background-color: #c0c0c0; }
+
+  #completedTasks, #completedAppointments {
+    background: #d0d0d0;
+    padding: 10px;
+    border-radius: 8px;
+  }
+  body.dark #completedTasks,
+  body.dark #completedAppointments {
+    background: #3a3a3a;
+  }
+
+  .overdue { color: red; font-weight: bold; }
+
+  /* --------- PRINT MODE (buttons + inputs hidden) --------- */
+  @media print {
+    button, input, select, #darkModeBtn { display: none !important; }
+    body { background: #fff !important; color: #000 !important; }
+    .column-left, .column-right { background: #fff !important; }
+  }
+</style>
+</head>
+
+<body>
+
+<h1>TaskLog - Capt Dzune  
+  <button id="darkModeBtn" onclick="toggleDarkMode()">🌙 Dark Mode</button>
+</h1>
+
+<input type="text" id="taskInput" placeholder="Enter a new task" />
+<input type="date" id="dueDateInput" />
+<select id="prioritySelect">
+  <option value="high">High</option>
+  <option value="medium" selected>Medium</option>
+  <option value="low">Low</option>
+</select>
+<button id="addTaskBtn" onclick="addTask()">Add Task</button>
+
+<button id="downloadCSVBtn" onclick="downloadCSV()">Download CSV</button>
+
+<br>
+<input type="text" id="searchInput" placeholder="Search..." oninput="filterEntries()" />
+
+<div class="columns">
+  <div class="column-left">
+    <h2>Tasks</h2>
+    <ul id="taskList"></ul>
+
+    <h3>Completed Tasks</h3>
+    <div id="completedTasks">
+      <ul id="completedTaskList"></ul>
+    </div>
+  </div>
+
+  <div class="column-right">
+    <h2>Appointments</h2>
+
+    <input type="text" id="apptInput" placeholder="Appointment description" />
+    <input type="date" id="apptDateInput" />
+    <input type="time" id="apptTimeInput" />
+
+    <select id="apptPrioritySelect">
+      <option value="high">High</option>
+      <option value="medium" selected>Medium</option>
+      <option value="low">Low</option>
+      <option value="urgent">Urgent</option>
+    </select>
+
+    <button id="addApptBtn" onclick="addAppointment()">Add Appointment</button>
+
+    <ul id="apptList"></ul>
+
+    <h3>Completed Appointments</h3>
+    <div id="completedAppointments">
+      <ul id="completedApptList"></ul>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   ============   LOCAL STORAGE SAVE / LOAD   ==================
+   ============================================================ */
+
+function saveAll() {
+  const data = {
+    dark: document.body.classList.contains("dark"),
+    tasks: [],
+    completedTasks: [],
+    appts: [],
+    completedAppts: []
+  };
+
+  // Tasks
+  document.querySelectorAll("#taskList li").forEach(li => {
+    data.tasks.push({
+      text: li.querySelector("strong").textContent,
+      due: li.dataset.due || "",
+      priority: li.className.replace("task-", ""),
+      comment: li.querySelector("textarea").value || ""
+    });
+  });
+
+  // Completed tasks
+  document.querySelectorAll("#completedTaskList li").forEach(li => {
+    data.completedTasks.push({
+      text: li.querySelector("strong").textContent,
+      due: li.dataset.due || "",
+      priority: li.className.replace("task-", ""),
+      comment: li.querySelector("textarea").value || ""
+    });
+  });
+
+  // Appointments
+  document.querySelectorAll("#apptList li").forEach(li => {
+    data.appts.push({
+      text: li.querySelector("strong").textContent,
+      date: li.dataset.date || "",
+      time: li.dataset.time || "",
+      priority: li.className.replace("appt-", ""),
+      comment: li.querySelector("textarea").value || ""
+    });
+  });
+
+  // Completed appointments
+  document.querySelectorAll("#completedApptList li").forEach(li => {
+    data.completedAppts.push({
+      text: li.querySelector("strong").textContent,
+      date: li.dataset.date || "",
+      time: li.dataset.time || "",
+      priority: li.className.replace("appt-", ""),
+      comment: li.querySelector("textarea").value || ""
+    });
+  });
+
+  localStorage.setItem("tasklog_data", JSON.stringify(data));
+}
+
+/* ============================================================
+   ================== CREATE LIST ITEMS ========================
+   ============================================================ */
+
+function createTaskLi(item, isCompleted) {
+  const li = document.createElement("li");
+  li.className = "task-" + item.priority;
+  li.dataset.due = item.due || "";
+
+  const top = document.createElement("div");
+  top.className = "task-top";
+
+  const strong = document.createElement("strong");
+  strong.textContent = item.text;
+
+  const span = document.createElement("span");
+  if (item.due) span.textContent = `(Due: ${item.due})`;
+  checkOverdue(span, item.due);
+
+  top.appendChild(strong);
+  top.appendChild(span);
+
+  if (!isCompleted) {
+    const complete = document.createElement("button");
+    complete.textContent = "Complete";
+    complete.style.background = "#28a745";
+    complete.style.color = "#fff";
+    complete.onclick = () => moveToCompletedTask(li);
+    top.appendChild(complete);
+  }
+
+  // NEW: Edit button for tasks
+  const edit = document.createElement("button");
+  edit.textContent = "Edit";
+  edit.style.background = "#ffc107";
+  edit.style.color = "#000";
+  edit.onclick = () => editTask(li);
+  top.appendChild(edit);
+
+  const del = document.createElement("button");
+  del.textContent = "Delete";
+  del.style.background = "#ff4136";
+  del.style.color = "#fff";
+  del.onclick = () => { li.remove(); saveAll(); };
+  top.appendChild(del);
+
+  const comment = document.createElement("textarea");
+  comment.value = item.comment || "";
+  comment.oninput = saveAll;
+
+  const clear = document.createElement("button");
+  clear.className = "clear-btn";
+  clear.textContent = "Clear Comment";
+  clear.onclick = () => { comment.value = ""; saveAll(); };
+
+  li.appendChild(top);
+  li.appendChild(comment);
+  li.appendChild(clear);
+
+  return li;
+}
+
+function createApptLi(item, isCompleted) {
+  const li = document.createElement("li");
+  li.className = "appt-" + item.priority;
+  li.dataset.date = item.date || "";
+  li.dataset.time = item.time || "";
+
+  const top = document.createElement("div");
+  top.className = "task-top";
+
+  const strong = document.createElement("strong");
+  strong.textContent = item.text;
+
+  const span = document.createElement("span");
+  if (item.date) {
+    span.textContent = `(Date: ${item.date}${item.time ? " " + item.time : ""})`;
+  }
+
+  top.appendChild(strong);
+  top.appendChild(span);
+
+  if (!isCompleted) {
+    const complete = document.createElement("button");
+    complete.textContent = "Complete";
+    complete.style.background = "#28a745";
+    complete.style.color = "#fff";
+    complete.onclick = () => moveToCompletedAppt(li);
+    top.appendChild(complete);
+  }
+
+  // NEW: Edit button for appointments
+  const edit = document.createElement("button");
+  edit.textContent = "Edit";
+  edit.style.background = "#ffc107";
+  edit.style.color = "#000";
+  edit.onclick = () => editAppointment(li);
+  top.appendChild(edit);
+
+  const del = document.createElement("button");
+  del.textContent = "Delete";
+  del.style.background = "#ff4136";
+  del.style.color = "#fff";
+  del.onclick = () => { li.remove(); saveAll(); };
+  top.appendChild(del);
+
+  const comment = document.createElement("textarea");
+  comment.value = item.comment || "";
+  comment.oninput = saveAll;
+
+  const clear = document.createElement("button");
+  clear.className = "clear-btn";
+  clear.textContent = "Clear Comment";
+  clear.onclick = () => { comment.value = ""; saveAll(); };
+
+  li.appendChild(top);
+  li.appendChild(comment);
+  li.appendChild(clear);
+
+  return li;
+}
+
+/* ============================================================
+   ======================== LOAD ALL ===========================
+   ============================================================ */
+
+function loadAll() {
+  const raw = localStorage.getItem("tasklog_data");
+  if (!raw) return;
+
+  const data = JSON.parse(raw);
+
+  taskList.innerHTML = "";
+  completedTaskList.innerHTML = "";
+  apptList.innerHTML = "";
+  completedApptList.innerHTML = "";
+
+  if (data.dark) document.body.classList.add("dark");
+
+  (data.tasks || []).forEach(item => {
+    taskList.appendChild(createTaskLi(item, false));
+  });
+
+  (data.completedTasks || []).forEach(item => {
+    completedTaskList.appendChild(createTaskLi(item, true));
+  });
+
+  (data.appts || []).forEach(item => {
+    apptList.appendChild(createApptLi(item, false));
+  });
+
+  (data.completedAppts || []).forEach(item => {
+    completedApptList.appendChild(createApptLi(item, true));
+  });
+
+  sortTasks();
+  sortAppointments();
+}
+
+/* ============================================================
+   ======================= EDIT HANDLERS =======================
+   ============================================================ */
+
+function editTask(li) {
+  const strong = li.querySelector("strong");
+  const span = li.querySelector("span");
+
+  const oldText = strong.textContent;
+  const oldDue = li.dataset.due || "";
+
+  const newText = prompt("Edit task title:", oldText);
+  if (newText === null) return; // cancelled
+  const newDue = prompt("Edit due date (YYYY-MM-DD):", oldDue);
+
+  strong.textContent = newText.trim() || oldText;
+  li.dataset.due = newDue || "";
+
+  if (newDue) {
+    span.textContent = `(Due: ${newDue})`;
+  } else {
+    span.textContent = "";
+  }
+
+  checkOverdue(span, newDue);
+  sortTasks();
+  saveAll();
+}
+
+function editAppointment(li) {
+  const strong = li.querySelector("strong");
+  const span = li.querySelector("span");
+
+  const oldText = strong.textContent;
+  const oldDate = li.dataset.date || "";
+  const oldTime = li.dataset.time || "";
+
+  const newText = prompt("Edit appointment title:", oldText);
+  if (newText === null) return; // cancelled
+  const newDate = prompt("Edit date (YYYY-MM-DD):", oldDate);
+  if (newDate === null) return; // cancelled
+  const newTime = prompt("Edit time (HH:MM):", oldTime);
+
+  strong.textContent = newText.trim() || oldText;
+  li.dataset.date = newDate || "";
+  li.dataset.time = newTime || "";
+
+  if (newDate) {
+    span.textContent = `(Date: ${newDate}${newTime ? " " + newTime : ""})`;
+  } else {
+    span.textContent = "";
+  }
+
+  sortAppointments();
+  saveAll();
+}
+
+/* ============================================================
+   ======================= DARK MODE ===========================
+   ============================================================ */
+function toggleDarkMode() {
+  document.body.classList.toggle("dark");
+  saveAll();
+}
+
+/* ============================================================
+   ====================== SORTING LOGIC ========================
+   ============================================================ */
+function getDateValue(d) {
+  return d ? new Date(d).getTime() : Infinity;
+}
+
+function getApptDateValue(date, time) {
+  return date ? new Date(date + " " + (time || "00:00")).getTime() : Infinity;
+}
+
+function sortTasks() {
+  const items = [...taskList.children];
+  items.sort((a, b) => getDateValue(a.dataset.due) - getDateValue(b.dataset.due));
+  items.forEach(li => taskList.appendChild(li));
+  saveAll();
+}
+
+function sortAppointments() {
+  const items = [...apptList.children];
+  items.sort((a, b) => getApptDateValue(a.dataset.date, a.dataset.time) -
+                      getApptDateValue(b.dataset.date, b.dataset.time));
+  items.forEach(li => apptList.appendChild(li));
+  saveAll();
+}
+
+/* ============================================================
+   ======================= ADD TASK ============================
+   ============================================================ */
+function addTask() {
+  const text = taskInput.value.trim();
+  const due = dueDateInput.value;
+  const priority = prioritySelect.value;
+  if (!text) return;
+
+  const item = {
+    text,
+    due,
+    priority,
+    comment: ""
+  };
+
+  const li = createTaskLi(item, false);
+  taskList.appendChild(li);
+
+  sortTasks();
+  saveAll();
+
+  taskInput.value = "";
+  dueDateInput.value = "";
+}
+
+/* ============================================================
+   ==================== ADD APPOINTMENT ========================
+   ============================================================ */
+function addAppointment() {
+  const text = apptInput.value.trim();
+  const date = apptDateInput.value;
+  const time = apptTimeInput.value;
+  const priority = apptPrioritySelect.value;
+  if (!text) return;
+
+  const item = {
+    text,
+    date,
+    time,
+    priority,
+    comment: ""
+  };
+
+  const li = createApptLi(item, false);
+  apptList.appendChild(li);
+
+  sortAppointments();
+  saveAll();
+
+  apptInput.value = "";
+  apptDateInput.value = "";
+  apptTimeInput.value = "";
+}
+
+/* ============================================================
+   ==================== COMPLETED ITEMS ========================
+   ============================================================ */
+function moveToCompletedTask(li) {
+  // remove existing Complete button only
+  const btn = [...li.querySelectorAll("button")].find(b => b.textContent === "Complete");
+  if (btn) btn.remove();
+  completedTaskList.appendChild(li);
+  saveAll();
+}
+
+function moveToCompletedAppt(li) {
+  const btn = [...li.querySelectorAll("button")].find(b => b.textContent === "Complete");
+  if (btn) btn.remove();
+  completedApptList.appendChild(li);
+  saveAll();
+}
+
+/* ============================================================
+   ===================== SEARCH FILTER =========================
+   ============================================================ */
+function filterEntries() {
+  const f = searchInput.value.toLowerCase();
+  document.querySelectorAll("li").forEach(li => {
+    const text = li.querySelector("strong").textContent.toLowerCase();
+    const comment = li.querySelector("textarea")?.value.toLowerCase() || "";
+    li.style.display = (text.includes(f) || comment.includes(f)) ? "" : "none";
+  });
+}
+
+/* ============================================================
+   ====================== CSV EXPORT ==========================
+   ============================================================ */
+function downloadCSV() {
+  let csv = "Task,Date/Time,Comment,Priority\n";
+
+  document.querySelectorAll("#taskList li").forEach(li => {
+    const text = li.querySelector("strong").textContent.replace(/,/g, "");
+    const date = li.dataset.due || "";
+    const comment = li.querySelector("textarea").value.replace(/,/g, "");
+    const pri = li.className.replace("task-", "");
+    csv += `${text},${date},${comment},${pri}\n`;
+  });
+
+  document.querySelectorAll("#apptList li").forEach(li => {
+    const text = li.querySelector("strong").textContent.replace(/,/g, "");
+    const date = li.dataset.date || "";
+    const time = li.dataset.time || "";
+    const comment = li.querySelector("textarea").value.replace(/,/g, "");
+    const pri = li.className.replace("appt-", "");
+    csv += `${text},${date} ${time},${comment},${pri}\n`;
+  });
+
+  const link = document.createElement("a");
+  link.href = "data:text/csv;charset=utf-8," + encodeURI(csv);
+  link.download = "tasklog.csv";
+  link.click();
+}
+
+/* ============================================================
+   ======================= OVERDUE CHECK =======================
+   ============================================================ */
+function checkOverdue(span, due) {
+  if (!due) return;
+  const now = new Date();
+  const d = new Date(due);
+  if (d < now) span.classList.add("overdue");
+}
+
+/* ============================================================
+   ========================== INIT =============================
+   ============================================================ */
+window.onload = function() {
+  loadAll();
+};
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function () {
+    navigator.serviceWorker.register('service-worker.js').catch(function (err) {
+      console.log('Service worker registration failed:', err);
+    });
+  });
+}
+</script>
+</body>
+</html>
