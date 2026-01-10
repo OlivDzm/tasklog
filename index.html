@@ -6,27 +6,25 @@
 <title>TaskLog - Capt Dzune</title>
 <link rel="manifest" href="manifest.json">
 
-<!-- ================== FIREBASE SDK ================== -->
+<!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js"></script>
 
 <style>
-  /* ... Your current CSS remains unchanged ... */
-  body {
-    font-family: Arial, sans-serif;
-    background-color: var(--bg);
-    color: var(--text);
-    margin: 0;
-    padding: 20px;
-    transition: background 0.3s, color 0.3s;
-  }
-  /* Include all your existing CSS here */
-  /* ... truncated for brevity ... */
+/* Include your current CSS exactly as it is */
+body {
+  font-family: Arial, sans-serif;
+  background-color: var(--bg);
+  color: var(--text);
+  margin: 0;
+  padding: 20px;
+  transition: background 0.3s, color 0.3s;
+}
+/* ... rest of your CSS ... */
 </style>
 </head>
 
 <body>
-
 <h1>TaskLog - Capt Dzune  
   <button id="darkModeBtn" onclick="toggleDarkMode()">🌙 Dark Mode</button>
 </h1>
@@ -39,7 +37,6 @@
   <option value="low">Low</option>
 </select>
 <button id="addTaskBtn" onclick="addTask()">Add Task</button>
-
 <button id="downloadCSVBtn" onclick="downloadCSV()">Download CSV</button>
 
 <br>
@@ -49,7 +46,6 @@
   <div class="column-left">
     <h2>Tasks</h2>
     <ul id="taskList"></ul>
-
     <h3>Completed Tasks</h3>
     <div id="completedTasks">
       <ul id="completedTaskList"></ul>
@@ -58,22 +54,17 @@
 
   <div class="column-right">
     <h2>Appointments</h2>
-
     <input type="text" id="apptInput" placeholder="Appointment description" />
     <input type="date" id="apptDateInput" />
     <input type="time" id="apptTimeInput" />
-
     <select id="apptPrioritySelect">
       <option value="high">High</option>
       <option value="medium" selected>Medium</option>
       <option value="low">Low</option>
       <option value="urgent">Urgent</option>
     </select>
-
     <button id="addApptBtn" onclick="addAppointment()">Add Appointment</button>
-
     <ul id="apptList"></ul>
-
     <h3>Completed Appointments</h3>
     <div id="completedAppointments">
       <ul id="completedApptList"></ul>
@@ -82,7 +73,7 @@
 </div>
 
 <script>
-/* ================= FIREBASE CONFIG ================== */
+/* ========== FIREBASE CONFIG ========= */
 const firebaseConfig = {
   apiKey: "AIzaSyCNAdaLUesH53YUMKWkX0NRAKbmcK6N4YM",
   authDomain: "tasklog-dc1fb.firebaseapp.com",
@@ -93,14 +84,11 @@ const firebaseConfig = {
 };
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
+const userId = "defaultUser"; // Simple shared user ID; later you can add login
 
-/* ================= USER ID ================== */
-// For now, a default user. Later you can add login for personal accounts.
-const userId = "defaultUser";
-
-/* ================= SAVE / LOAD ================== */
+/* ========== SAVE TO FIRESTORE ========== */
 async function saveAll() {
-  const data = {
+  const data = { 
     dark: document.body.classList.contains("dark"),
     tasks: [],
     completedTasks: [],
@@ -108,7 +96,6 @@ async function saveAll() {
     completedAppts: []
   };
 
-  // Tasks
   document.querySelectorAll("#taskList li").forEach(li => {
     data.tasks.push({
       text: li.querySelector("strong").textContent,
@@ -155,13 +142,13 @@ async function saveAll() {
   }
 }
 
+/* ========== LOAD FROM FIRESTORE ========== */
 async function loadAll() {
   try {
     const doc = await db.collection("tasks").doc(userId).get();
     if (!doc.exists) return;
 
     const data = doc.data();
-
     taskList.innerHTML = "";
     completedTaskList.innerHTML = "";
     apptList.innerHTML = "";
@@ -169,21 +156,10 @@ async function loadAll() {
 
     if (data.dark) document.body.classList.add("dark");
 
-    (data.tasks || []).forEach(item => {
-      taskList.appendChild(createTaskLi(item, false));
-    });
-
-    (data.completedTasks || []).forEach(item => {
-      completedTaskList.appendChild(createTaskLi(item, true));
-    });
-
-    (data.appts || []).forEach(item => {
-      apptList.appendChild(createApptLi(item, false));
-    });
-
-    (data.completedAppts || []).forEach(item => {
-      completedApptList.appendChild(createApptLi(item, true));
-    });
+    (data.tasks || []).forEach(item => taskList.appendChild(createTaskLi(item,false)));
+    (data.completedTasks || []).forEach(item => completedTaskList.appendChild(createTaskLi(item,true)));
+    (data.appts || []).forEach(item => apptList.appendChild(createApptLi(item,false)));
+    (data.completedAppts || []).forEach(item => completedApptList.appendChild(createApptLi(item,true)));
 
     sortTasks();
     sortAppointments();
@@ -192,12 +168,13 @@ async function loadAll() {
   }
 }
 
-/* ================= REST OF APP ================== */
-// All your existing functions: createTaskLi, createApptLi, addTask, addAppointment, editTask, editAppointment, etc.
-// Just replace calls to localStorage with saveAll() / loadAll() already updated above.
-
+/* ========== REST OF YOUR EXISTING FUNCTIONS ========== */
+/* createTaskLi, createApptLi, addTask, addAppointment, editTask, editAppointment, etc. */
+/* Use saveAll() after every change instead of localStorage */
 window.onload = loadAll;
 
+function toggleDarkMode() { document.body.classList.toggle("dark"); saveAll(); }
+/* ... include all your other functions exactly as before, replacing localStorage calls with saveAll() ... */
 </script>
 
 <script>
@@ -209,7 +186,5 @@ if ('serviceWorker' in navigator) {
   });
 }
 </script>
-
 </body>
 </html>
-
