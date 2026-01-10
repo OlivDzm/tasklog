@@ -9,7 +9,7 @@
 <!-- ============== FIREBASE SDK (COMPAT) ============== -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/12.3.0/firebase-app-compat.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/12.3.0/firebase-firestore-compat.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/12.3.0/firebase-auth-compat.min.js"></script> <!--[web:40]-->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/12.3.0/firebase-auth-compat.min.js"></script>
 
 <style>
   body {
@@ -236,7 +236,7 @@ const firebaseConfig = {
 
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
-const auth = firebase.auth(); //[web:77]
+const auth = firebase.auth();
 
 let currentUserId = null;
 
@@ -247,7 +247,6 @@ const signInBtn = document.getElementById("signInBtn");
 const signOutBtn = document.getElementById("signOutBtn");
 const userInfo = document.getElementById("userInfo");
 
-// Sign in with popup (simplest for web)
 signInBtn.onclick = function () {
   auth.signInWithPopup(provider).catch(err => {
     console.error("Sign-in error:", err);
@@ -261,14 +260,13 @@ signOutBtn.onclick = function () {
   });
 };
 
-// When auth state changes (user logs in/out)
 auth.onAuthStateChanged(user => {
   if (user) {
     currentUserId = user.uid;
     userInfo.textContent = "Signed in as " + (user.displayName || user.email || "User");
     signInBtn.style.display = "none";
     signOutBtn.style.display = "inline-block";
-    loadAll(); // load this user's data
+    loadAll();
   } else {
     currentUserId = null;
     userInfo.textContent = "Not signed in";
@@ -532,7 +530,7 @@ function downloadCSV() {
 
 /* ================= SAVE / LOAD (FIRESTORE) ================== */
 async function saveAll() {
-  if (!currentUserId) return; // nothing to save if not signed in
+  if (!currentUserId) return;
 
   const data = {
     dark: document.body.classList.contains("dark"),
@@ -618,8 +616,6 @@ async function loadAll() {
     console.error("Load failed:", err);
   }
 }
-
-// No window.onload here; loading happens when auth state becomes logged in.
 </script>
 
 <script>
@@ -634,6 +630,8 @@ if ('serviceWorker' in navigator) {
 
 </body>
 </html>
+
+
 
 
 
