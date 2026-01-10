@@ -7,9 +7,9 @@
 <link rel="manifest" href="manifest.json">
 
 <!-- ============== FIREBASE SDK (COMPAT) ============== -->
-<!-- Use compat so firebase.initializeApp / firebase.firestore() work -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/12.3.0/firebase-app-compat.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/12.3.0/firebase-firestore-compat.min.js"></script> <!--[web:40]-->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/12.3.0/firebase-firestore-compat.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/12.3.0/firebase-auth-compat.min.js"></script> <!--[web:40]-->
 
 <style>
   body {
@@ -41,8 +41,17 @@
     --input-text: #fff;
   }
 
-  h1 { margin-bottom: 20px; }
+  h1 { margin-bottom: 10px; }
   h2, h3 { color: var(--text); }
+
+  .auth-bar {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+    font-size: 0.9em;
+  }
 
   .columns { display: flex; gap: 30px; margin-top: 20px; }
   @media (max-width: 768px) { .columns { flex-direction: column; } }
@@ -114,6 +123,21 @@
   #darkModeBtn { background: #444; color: #fff; margin-left: 10px; }
   body.dark #darkModeBtn { background: #ddd; color: #000; }
 
+  .auth-btn {
+    background-color: #db4437;
+    color: #fff;
+  }
+  .auth-btn:hover {
+    background-color: #b33629;
+  }
+  .signout-btn {
+    background-color: #555;
+    color: #fff;
+  }
+  .signout-btn:hover {
+    background-color: #333;
+  }
+
   .clear-btn {
     background-color: #dcdcdc;
     border: 1.5px solid #b0b0b0;
@@ -145,6 +169,12 @@
 </head>
 
 <body>
+
+<div class="auth-bar">
+  <span id="userInfo">Not signed in</span>
+  <button id="signInBtn" class="auth-btn">Sign in with Google</button>
+  <button id="signOutBtn" class="signout-btn" style="display:none;">Sign out</button>
+</div>
 
 <h1>TaskLog
   <button id="darkModeBtn" onclick="toggleDarkMode()">🌙 Dark Mode</button>
@@ -204,13 +234,57 @@ const firebaseConfig = {
   appId: "1:818713885396:web:813e478a8ee0e1ea029941"
 };
 
-// Compat style: works with the script tags above
 firebase.initializeApp(firebaseConfig);
-const db = firebase.firestore(); //[web:42]
+const db = firebase.firestore();
+const auth = firebase.auth(); //[web:77]
 
-/* ================= SIMPLE USER ID ================== */
-/* Later this can be replaced by real auth (login) */
-const userId = "defaultUser";
+let currentUserId = null;
+
+/* ============ AUTH: GOOGLE SIGN-IN ============ */
+const provider = new firebase.auth.GoogleAuthProvider();
+
+const signInBtn = document.getElementById("signInBtn");
+const signOutBtn = document.getElementById("signOutBtn");
+const userInfo = document.getElementById("userInfo");
+
+// Sign in with popup (simplest for web)
+signInBtn.onclick = function () {
+  auth.signInWithPopup(provider).catch(err => {
+    console.error("Sign-in error:", err);
+    alert("Sign-in failed: " + err.message);
+  });
+};
+
+signOutBtn.onclick = function () {
+  auth.signOut().catch(err => {
+    console.error("Sign-out error:", err);
+  });
+};
+
+// When auth state changes (user logs in/out)
+auth.onAuthStateChanged(user => {
+  if (user) {
+    currentUserId = user.uid;
+    userInfo.textContent = "Signed in as " + (user.displayName || user.email || "User");
+    signInBtn.style.display = "none";
+    signOutBtn.style.display = "inline-block";
+    loadAll(); // load this user's data
+  } else {
+    currentUserId = null;
+    userInfo.textContent = "Not signed in";
+    signInBtn.style.display = "inline-block";
+    signOutBtn.style.display = "none";
+    clearUI();
+  }
+});
+
+/* ============ UI HELPERS ============ */
+function clearUI() {
+  document.getElementById("taskList").innerHTML = "";
+  document.getElementById("completedTaskList").innerHTML = "";
+  document.getElementById("apptList").innerHTML = "";
+  document.getElementById("completedApptList").innerHTML = "";
+}
 
 /* ================= BASIC HELPERS ================== */
 function createTaskLi(item, completed) {
@@ -225,11 +299,7 @@ function createTaskLi(item, completed) {
   strong.textContent = item.text || "";
 
   const meta = document.createElement("span");
-  if (item.due) {
-    meta.textContent = "Due: " + item.due;
-  } else {
-    meta.textContent = "";
-  }
+  meta.textContent = item.due ? "Due: " + item.due : "";
 
   const btns = document.createElement("div");
 
@@ -349,6 +419,11 @@ function createApptLi(item, completed) {
 
 /* ================ CORE APP FUNCTIONS ================= */
 function addTask() {
+  if (!currentUserId) {
+    alert("Please sign in first.");
+    return;
+  }
+
   const text = document.getElementById("taskInput").value.trim();
   const due = document.getElementById("dueDateInput").value;
   const priority = document.getElementById("prioritySelect").value;
@@ -366,6 +441,11 @@ function addTask() {
 }
 
 function addAppointment() {
+  if (!currentUserId) {
+    alert("Please sign in first.");
+    return;
+  }
+
   const text = document.getElementById("apptInput").value.trim();
   const date = document.getElementById("apptDateInput").value;
   const time = document.getElementById("apptTimeInput").value;
@@ -452,6 +532,8 @@ function downloadCSV() {
 
 /* ================= SAVE / LOAD (FIRESTORE) ================== */
 async function saveAll() {
+  if (!currentUserId) return; // nothing to save if not signed in
+
   const data = {
     dark: document.body.classList.contains("dark"),
     tasks: [],
@@ -499,28 +581,29 @@ async function saveAll() {
   });
 
   try {
-    await db.collection("tasks").doc(userId).set(data);
-    console.log("Saved to Firebase!");
+    await db.collection("tasks").doc(currentUserId).set(data);
+    console.log("Saved to Firebase for user:", currentUserId);
   } catch (err) {
     console.error("Save failed:", err);
   }
 }
 
 async function loadAll() {
+  if (!currentUserId) return;
+
   try {
-    const docSnap = await db.collection("tasks").doc(userId).get();
+    const docSnap = await db.collection("tasks").doc(currentUserId).get();
+    clearUI();
+    document.body.classList.remove("dark");
+
     if (!docSnap.exists) return;
+
     const data = docSnap.data();
 
     const taskList = document.getElementById("taskList");
     const completedTaskList = document.getElementById("completedTaskList");
     const apptList = document.getElementById("apptList");
     const completedApptList = document.getElementById("completedApptList");
-
-    taskList.innerHTML = "";
-    completedTaskList.innerHTML = "";
-    apptList.innerHTML = "";
-    completedApptList.innerHTML = "";
 
     if (data.dark) document.body.classList.add("dark");
 
@@ -536,7 +619,7 @@ async function loadAll() {
   }
 }
 
-window.onload = loadAll;
+// No window.onload here; loading happens when auth state becomes logged in.
 </script>
 
 <script>
@@ -551,6 +634,7 @@ if ('serviceWorker' in navigator) {
 
 </body>
 </html>
+
 
 
 
