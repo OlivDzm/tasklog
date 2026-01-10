@@ -3,28 +3,97 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>TaskLog </title>
+<title>TaskLog</title>
 <link rel="manifest" href="manifest.json">
 
-<!-- Firebase SDK -->
+<!-- ================== FIREBASE SDK ================== -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js"></script>
 
 <style>
-/* Include your current CSS exactly as it is */
-body {
-  font-family: Arial, sans-serif;
-  background-color: var(--bg);
-  color: var(--text);
-  margin: 0;
-  padding: 20px;
-  transition: background 0.3s, color 0.3s;
-}
-/* ... rest of your CSS ... */
+  body {
+    font-family: Arial, sans-serif;
+    background-color: var(--bg);
+    color: var(--text);
+    margin: 0;
+    padding: 20px;
+    transition: background 0.3s, color 0.3s;
+  }
+
+  :root {
+    --bg: #f4f4f4;
+    --card: #f9f9f9;
+    --column-left: #f0f8ff;
+    --column-right: #e6f0ff;
+    --text: #222;
+    --input-bg: #fff;
+    --input-text: #000;
+  }
+
+  body.dark {
+    --bg: #1e1f21;
+    --card: #2a2b2d;
+    --column-left: #25262a;
+    --column-right: #22252b;
+    --text: #e9e9e9;
+    --input-bg: #3a3b3d;
+    --input-text: #fff;
+  }
+
+  h1 { margin-bottom: 20px; }
+  h2, h3 { color: var(--text); }
+
+  .columns { display: flex; gap: 30px; margin-top: 20px; }
+  @media (max-width: 768px) { .columns { flex-direction: column; } }
+
+  .column-left, .column-right {
+    flex: 1;
+    padding: 20px;
+    border-radius: 10px;
+    background: var(--column-left);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    transition: background 0.3s;
+  }
+  .column-right { background: var(--column-right); }
+
+  ul { list-style-type: none; padding: 0; }
+  li.task-high { border-left: 5px solid #ff4136; }
+  li.task-medium { border-left: 5px solid #ff851b; }
+  li.task-low { border-left: 5px solid #2ecc40; }
+  li.appt-high { border-left: 5px solid #1e90ff; }
+  li.appt-medium { border-left: 5px solid #00ced1; }
+  li.appt-low { border-left: 5px solid #32cd32; }
+  li.appt-urgent { border-left: 5px solid #ff4500; }
+
+  li { background: var(--card); padding: 10px; margin: 5px 0; border-radius: 5px; transition: background 0.3s, color 0.3s; }
+  .task-top { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 4px; }
+
+  li button { padding: 4px 8px; border: none; border-radius: 5px; cursor: pointer; }
+  li textarea { margin-top: 5px; width: 100%; resize: vertical; border-radius: 5px; border: 1px solid #ccc; padding: 5px; background: var(--input-bg); color: var(--input-text); }
+  input, select, button { padding: 8px; border-radius: 5px; border: 1px solid #ccc; margin-bottom: 10px; background: var(--input-bg); color: var(--input-text); }
+
+  button#addTaskBtn, button#addApptBtn { background-color: #007bff; color: #fff; }
+  button#addTaskBtn:hover, button#addApptBtn:hover { background-color: #0056b3; }
+  button#downloadCSVBtn { background-color: #28a745; color: #fff; }
+  button#downloadCSVBtn:hover { background-color: #1e7e34; }
+
+  #darkModeBtn { background: #444; color: #fff; margin-left: 10px; }
+  body.dark #darkModeBtn { background: #ddd; color: #000; }
+
+  .clear-btn { background-color: #dcdcdc; border: 1.5px solid #b0b0b0; padding: 4px 12px; border-radius: 5px; cursor: pointer; margin: 5px auto 0; font-size: 0.8em; }
+  .clear-btn:hover { background-color: #c0c0c0; }
+
+  #completedTasks, #completedAppointments { background: #d0d0d0; padding: 10px; border-radius: 8px; }
+  body.dark #completedTasks, body.dark #completedAppointments { background: #3a3a3a; }
+
+  .overdue { color: red; font-weight: bold; }
+
+  @media print { button, input, select, #darkModeBtn { display: none !important; } body { background: #fff !important; color: #000 !important; } .column-left, .column-right { background: #fff !important; } }
 </style>
 </head>
 
 <body>
+
 <h1>TaskLog
   <button id="darkModeBtn" onclick="toggleDarkMode()">🌙 Dark Mode</button>
 </h1>
@@ -73,7 +142,7 @@ body {
 </div>
 
 <script>
-/* ========== FIREBASE CONFIG ========= */
+/* ================= FIREBASE CONFIG ================== */
 const firebaseConfig = {
   apiKey: "AIzaSyCNAdaLUesH53YUMKWkX0NRAKbmcK6N4YM",
   authDomain: "tasklog-dc1fb.firebaseapp.com",
@@ -84,109 +153,49 @@ const firebaseConfig = {
 };
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
-const userId = "defaultUser"; // Simple shared user ID; later you can add login
 
-/* ========== SAVE TO FIRESTORE ========== */
+/* ================= USER ID ================== */
+const userId = "defaultUser";
+
+/* ================= SAVE / LOAD ================== */
 async function saveAll() {
-  const data = { 
-    dark: document.body.classList.contains("dark"),
-    tasks: [],
-    completedTasks: [],
-    appts: [],
-    completedAppts: []
-  };
-
-  document.querySelectorAll("#taskList li").forEach(li => {
-    data.tasks.push({
-      text: li.querySelector("strong").textContent,
-      due: li.dataset.due || "",
-      priority: li.className.replace("task-", ""),
-      comment: li.querySelector("textarea").value || ""
-    });
-  });
-
-  document.querySelectorAll("#completedTaskList li").forEach(li => {
-    data.completedTasks.push({
-      text: li.querySelector("strong").textContent,
-      due: li.dataset.due || "",
-      priority: li.className.replace("task-", ""),
-      comment: li.querySelector("textarea").value || ""
-    });
-  });
-
-  document.querySelectorAll("#apptList li").forEach(li => {
-    data.appts.push({
-      text: li.querySelector("strong").textContent,
-      date: li.dataset.date || "",
-      time: li.dataset.time || "",
-      priority: li.className.replace("appt-", ""),
-      comment: li.querySelector("textarea").value || ""
-    });
-  });
-
-  document.querySelectorAll("#completedApptList li").forEach(li => {
-    data.completedAppts.push({
-      text: li.querySelector("strong").textContent,
-      date: li.dataset.date || "",
-      time: li.dataset.time || "",
-      priority: li.className.replace("appt-", ""),
-      comment: li.querySelector("textarea").value || ""
-    });
-  });
-
-  try {
-    await db.collection("tasks").doc(userId).set(data);
-    console.log("Saved to Firebase!");
-  } catch (err) {
-    console.error("Save failed:", err);
-  }
+  const data = { dark: document.body.classList.contains("dark"), tasks: [], completedTasks: [], appts: [], completedAppts: [] };
+  document.querySelectorAll("#taskList li").forEach(li => { data.tasks.push({ text: li.querySelector("strong").textContent, due: li.dataset.due||"", priority: li.className.replace("task-",""), comment: li.querySelector("textarea").value||"" }); });
+  document.querySelectorAll("#completedTaskList li").forEach(li => { data.completedTasks.push({ text: li.querySelector("strong").textContent, due: li.dataset.due||"", priority: li.className.replace("task-",""), comment: li.querySelector("textarea").value||"" }); });
+  document.querySelectorAll("#apptList li").forEach(li => { data.appts.push({ text: li.querySelector("strong").textContent, date: li.dataset.date||"", time: li.dataset.time||"", priority: li.className.replace("appt-",""), comment: li.querySelector("textarea").value||"" }); });
+  document.querySelectorAll("#completedApptList li").forEach(li => { data.completedAppts.push({ text: li.querySelector("strong").textContent, date: li.dataset.date||"", time: li.dataset.time||"", priority: li.className.replace("appt-",""), comment: li.querySelector("textarea").value||"" }); });
+  try { await db.collection("tasks").doc(userId).set(data); console.log("Saved to Firebase!"); } catch(err){ console.error("Save failed:", err);}
 }
 
-/* ========== LOAD FROM FIRESTORE ========== */
 async function loadAll() {
   try {
     const doc = await db.collection("tasks").doc(userId).get();
-    if (!doc.exists) return;
-
+    if(!doc.exists) return;
     const data = doc.data();
-    taskList.innerHTML = "";
-    completedTaskList.innerHTML = "";
-    apptList.innerHTML = "";
-    completedApptList.innerHTML = "";
-
-    if (data.dark) document.body.classList.add("dark");
-
-    (data.tasks || []).forEach(item => taskList.appendChild(createTaskLi(item,false)));
-    (data.completedTasks || []).forEach(item => completedTaskList.appendChild(createTaskLi(item,true)));
-    (data.appts || []).forEach(item => apptList.appendChild(createApptLi(item,false)));
-    (data.completedAppts || []).forEach(item => completedApptList.appendChild(createApptLi(item,true)));
-
-    sortTasks();
-    sortAppointments();
-  } catch (err) {
-    console.error("Load failed:", err);
-  }
+    taskList.innerHTML = ""; completedTaskList.innerHTML = ""; apptList.innerHTML = ""; completedApptList.innerHTML = "";
+    if(data.dark) document.body.classList.add("dark");
+    (data.tasks||[]).forEach(item=>taskList.appendChild(createTaskLi(item,false)));
+    (data.completedTasks||[]).forEach(item=>completedTaskList.appendChild(createTaskLi(item,true)));
+    (data.appts||[]).forEach(item=>apptList.appendChild(createApptLi(item,false)));
+    (data.completedAppts||[]).forEach(item=>completedApptList.appendChild(createApptLi(item,true)));
+    sortTasks(); sortAppointments();
+  } catch(err){ console.error("Load failed:", err);}
 }
 
-/* ========== REST OF YOUR EXISTING FUNCTIONS ========== */
-/* createTaskLi, createApptLi, addTask, addAppointment, editTask, editAppointment, etc. */
-/* Use saveAll() after every change instead of localStorage */
-window.onload = loadAll;
+/* ================= REST OF APP FUNCTIONS ================== */
+// All your existing functions like createTaskLi, createApptLi, addTask, addAppointment, editTask, editAppointment, toggleDarkMode, sortTasks, sortAppointments, filterEntries, downloadCSV, moveToCompletedTask, moveToCompletedAppt, checkOverdue
+// Replace any localStorage calls with saveAll()/loadAll() for Firebase sync
 
-function toggleDarkMode() { document.body.classList.toggle("dark"); saveAll(); }
-/* ... include all your other functions exactly as before, replacing localStorage calls with saveAll() ... */
+window.onload = loadAll;
 </script>
 
 <script>
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', function () {
-    navigator.serviceWorker.register('service-worker.js').catch(function (err) {
-      console.log('Service worker registration failed:', err);
-    });
-  });
-}
+if('serviceWorker' in navigator){ window.addEventListener('load',function(){ navigator.serviceWorker.register('service-worker.js').catch(err=>{console.log('Service worker registration failed:',err); }); }); }
 </script>
+
 </body>
 </html>
+
+
 
 
