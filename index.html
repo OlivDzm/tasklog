@@ -297,16 +297,12 @@ function createTaskLi(item, completed) {
   strong.textContent = item.text || "";
 
   const meta = document.createElement("span");
-  if (item.due) {
-    meta.textContent = "Due: " + item.due;
-    checkOverdue(meta, item.due);
-  }
+  meta.textContent = item.due ? "Due: " + item.due : "";
 
-  // EDIT BUTTON - YELLOW
+  const btns = document.createElement("div");
+
   const editBtn = document.createElement("button");
   editBtn.textContent = "Edit";
-  editBtn.style.background = "#ffc107";
-  editBtn.style.color = "#000";
   editBtn.onclick = function () {
     const newText = prompt("Edit task", strong.textContent);
     if (newText !== null && newText.trim() !== "") {
@@ -315,11 +311,8 @@ function createTaskLi(item, completed) {
     }
   };
 
-  // COMPLETE/UNDO BUTTON - GREEN
   const completeBtn = document.createElement("button");
   completeBtn.textContent = completed ? "Undo" : "Done";
-  completeBtn.style.background = "#28a745";
-  completeBtn.style.color = "#fff";
   completeBtn.onclick = function () {
     if (completed) {
       document.getElementById("taskList").appendChild(li);
@@ -329,37 +322,312 @@ function createTaskLi(item, completed) {
     saveAll();
   };
 
-  // DELETE BUTTON - RED
   const deleteBtn = document.createElement("button");
   deleteBtn.textContent = "Delete";
-  deleteBtn.style.background = "#ff4136";
-  deleteBtn.style.color = "#fff";
   deleteBtn.onclick = function () {
     li.remove();
     saveAll();
   };
 
+  btns.appendChild(editBtn);
+  btns.appendChild(completeBtn);
+  btns.appendChild(deleteBtn);
+
   top.appendChild(strong);
   top.appendChild(meta);
-  top.appendChild(editBtn);
-  top.appendChild(completeBtn);
-  top.appendChild(deleteBtn);
+  top.appendChild(btns);
 
   const textarea = document.createElement("textarea");
   textarea.placeholder = "Comments...";
   textarea.value = item.comment || "";
   textarea.onchange = saveAll;
 
-  const clearBtn = document.createElement("button");
-  clearBtn.className = "clear-btn";
-  clearBtn.textContent = "Clear Comment";
-  clearBtn.onclick = function () {
-    textarea.value = "";
+  li.appendChild(top);
+  li.appendChild(textarea);
+
+  return li;
+}
+
+function createApptLi(item, completed) {
+  const li = document.createElement("li");
+  li.className = "appt-" + (item.priority || "medium");
+  li.dataset.date = item.date || "";
+  li.dataset.time = item.time || "";
+
+  const top = document.createElement("div");
+  top.className = "task-top";
+
+  const strong = document.createElement("strong");
+  strong.textContent = item.text || "";
+
+  const meta = document.createElement("span");
+  let metaText = "";
+  if (item.date) metaText += item.date;
+  if (item.time) metaText += (metaText ? " " : "") + item.time;
+  meta.textContent = metaText;
+
+  const btns = document.createElement("div");
+
+  const editBtn = document.createElement("button");
+  editBtn.textContent = "Edit";
+  editBtn.onclick = function () {
+    const newText = prompt("Edit appointment", strong.textContent);
+    if (newText !== null && newText.trim() !== "") {
+      strong.textContent = newText.trim();
+      saveAll();
+    }
+  };
+
+  const completeBtn = document.createElement("button");
+  completeBtn.textContent = completed ? "Undo" : "Done";
+  completeBtn.onclick = function () {
+    if (completed) {
+      document.getElementById("apptList").appendChild(li);
+    } else {
+      document.getElementById("completedApptList").appendChild(li);
+    }
     saveAll();
   };
 
+  const deleteBtn = document.createElement("button");
+  deleteBtn.textContent = "Delete";
+  deleteBtn.onclick = function () {
+    li.remove();
+    saveAll();
+  };
+
+  btns.appendChild(editBtn);
+  btns.appendChild(completeBtn);
+  btns.appendChild(deleteBtn);
+
+  top.appendChild(strong);
+  top.appendChild(meta);
+  top.appendChild(btns);
+
+  const textarea = document.createElement("textarea");
+  textarea.placeholder = "Comments...";
+  textarea.value = item.comment || "";
+  textarea.onchange = saveAll;
+
   li.appendChild(top);
   li.appendChild(textarea);
-  li.appendChild(clearBtn);
 
   return li;
+}
+
+/* ================ CORE APP FUNCTIONS ================= */
+function addTask() {
+  if (!currentUserId) {
+    alert("Please sign in first.");
+    return;
+  }
+
+  const text = document.getElementById("taskInput").value.trim();
+  const due = document.getElementById("dueDateInput").value;
+  const priority = document.getElementById("prioritySelect").value;
+
+  if (!text) return;
+
+  const li = createTaskLi({ text, due, priority, comment: "" }, false);
+  document.getElementById("taskList").appendChild(li);
+
+  document.getElementById("taskInput").value = "";
+  document.getElementById("dueDateInput").value = "";
+
+  sortTasks();
+  saveAll();
+}
+
+function addAppointment() {
+  if (!currentUserId) {
+    alert("Please sign in first.");
+    return;
+  }
+
+  const text = document.getElementById("apptInput").value.trim();
+  const date = document.getElementById("apptDateInput").value;
+  const time = document.getElementById("apptTimeInput").value;
+  const priority = document.getElementById("apptPrioritySelect").value;
+
+  if (!text) return;
+
+  const li = createApptLi({ text, date, time, priority, comment: "" }, false);
+  document.getElementById("apptList").appendChild(li);
+
+  document.getElementById("apptInput").value = "";
+  document.getElementById("apptDateInput").value = "";
+  document.getElementById("apptTimeInput").value = "";
+
+  sortAppointments();
+  saveAll();
+}
+
+function toggleDarkMode() {
+  document.body.classList.toggle("dark");
+  saveAll();
+}
+
+function sortTasks() {
+  const list = document.getElementById("taskList");
+  const items = Array.from(list.children);
+  items.sort((a, b) => {
+    const da = a.dataset.due || "";
+    const db = b.dataset.due || "";
+    return da.localeCompare(db);
+  });
+  items.forEach(li => list.appendChild(li));
+}
+
+function sortAppointments() {
+  const list = document.getElementById("apptList");
+  const items = Array.from(list.children);
+  items.sort((a, b) => {
+    const da = a.dataset.date || "";
+    const db = b.dataset.date || "";
+    if (da !== db) return da.localeCompare(db);
+    const ta = a.dataset.time || "";
+    const tb = b.dataset.time || "";
+    return ta.localeCompare(tb);
+  });
+  items.forEach(li => list.appendChild(li));
+}
+
+function filterEntries() {
+  const q = document.getElementById("searchInput").value.toLowerCase();
+  ["taskList", "completedTaskList", "apptList", "completedApptList"].forEach(id => {
+    document.querySelectorAll("#" + id + " li").forEach(li => {
+      const text = li.querySelector("strong").textContent.toLowerCase();
+      const comment = li.querySelector("textarea").value.toLowerCase();
+      li.style.display = (text.includes(q) || comment.includes(q)) ? "" : "none";
+    });
+  });
+}
+
+function downloadCSV() {
+  let rows = [["Type", "Text", "Date", "Time", "Priority", "Completed", "Comment"]];
+  document.querySelectorAll("#taskList li").forEach(li => {
+    rows.push(["Task", li.querySelector("strong").textContent, li.dataset.due || "", "", li.className.replace("task-",""), "No", li.querySelector("textarea").value || ""]);
+  });
+  document.querySelectorAll("#completedTaskList li").forEach(li => {
+    rows.push(["Task", li.querySelector("strong").textContent, li.dataset.due || "", "", li.className.replace("task-",""), "Yes", li.querySelector("textarea").value || ""]);
+  });
+  document.querySelectorAll("#apptList li").forEach(li => {
+    rows.push(["Appointment", li.querySelector("strong").textContent, li.dataset.date || "", li.dataset.time || "", li.className.replace("appt-",""), "No", li.querySelector("textarea").value || ""]);
+  });
+  document.querySelectorAll("#completedApptList li").forEach(li => {
+    rows.push(["Appointment", li.querySelector("strong").textContent, li.dataset.date || "", li.dataset.time || "", li.className.replace("appt-",""), "Yes", li.querySelector("textarea").value || ""]);
+  });
+
+  const csvContent = rows.map(r => r.map(x => `"${(x || "").replace(/"/g,'""')}"`).join(",")).join("\n");
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "tasklog.csv";
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+/* ================= SAVE / LOAD (FIRESTORE) ================== */
+async function saveAll() {
+  if (!currentUserId) return;
+
+  const data = {
+    dark: document.body.classList.contains("dark"),
+    tasks: [],
+    completedTasks: [],
+    appts: [],
+    completedAppts: []
+  };
+
+  document.querySelectorAll("#taskList li").forEach(li => {
+    data.tasks.push({
+      text: li.querySelector("strong").textContent,
+      due: li.dataset.due || "",
+      priority: li.className.replace("task-",""),
+      comment: li.querySelector("textarea").value || ""
+    });
+  });
+
+  document.querySelectorAll("#completedTaskList li").forEach(li => {
+    data.completedTasks.push({
+      text: li.querySelector("strong").textContent,
+      due: li.dataset.due || "",
+      priority: li.className.replace("task-",""),
+      comment: li.querySelector("textarea").value || ""
+    });
+  });
+
+  document.querySelectorAll("#apptList li").forEach(li => {
+    data.appts.push({
+      text: li.querySelector("strong").textContent,
+      date: li.dataset.date || "",
+      time: li.dataset.time || "",
+      priority: li.className.replace("appt-",""),
+      comment: li.querySelector("textarea").value || ""
+    });
+  });
+
+  document.querySelectorAll("#completedApptList li").forEach(li => {
+    data.completedAppts.push({
+      text: li.querySelector("strong").textContent,
+      date: li.dataset.date || "",
+      time: li.dataset.time || "",
+      priority: li.className.replace("appt-",""),
+      comment: li.querySelector("textarea").value || ""
+    });
+  });
+
+  try {
+    await db.collection("tasks").doc(currentUserId).set(data);
+    console.log("Saved to Firebase for user:", currentUserId);
+  } catch (err) {
+    console.error("Save failed:", err);
+  }
+}
+
+async function loadAll() {
+  if (!currentUserId) return;
+
+  try {
+    const docSnap = await db.collection("tasks").doc(currentUserId).get();
+    clearUI();
+    document.body.classList.remove("dark");
+
+    if (!docSnap.exists) return;
+
+    const data = docSnap.data();
+
+    const taskList = document.getElementById("taskList");
+    const completedTaskList = document.getElementById("completedTaskList");
+    const apptList = document.getElementById("apptList");
+    const completedApptList = document.getElementById("completedApptList");
+
+    if (data.dark) document.body.classList.add("dark");
+
+    (data.tasks || []).forEach(item => taskList.appendChild(createTaskLi(item, false)));
+    (data.completedTasks || []).forEach(item => completedTaskList.appendChild(createTaskLi(item, true)));
+    (data.appts || []).forEach(item => apptList.appendChild(createApptLi(item, false)));
+    (data.completedAppts || []).forEach(item => completedApptList.appendChild(createApptLi(item, true)));
+
+    sortTasks();
+    sortAppointments();
+  } catch (err) {
+    console.error("Load failed:", err);
+  }
+}
+</script>
+
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function () {
+    navigator.serviceWorker.register('service-worker.js').catch(err => {
+      console.log('Service worker registration failed:', err);
+    });
+  });
+}
+</script>
+
+</body>
+</html>
+
